@@ -5,8 +5,8 @@ class Struct:
 
     def __init__(self, config=None):
         if config is None:
-            config = {"n_comp": 2,
-                      "discount_reward": 1,
+            config = {"n_comp": 22,
+                      "discount_reward": 0.95,
                       "k_comp": None,
                       "env_correlation": False,
                       "campaign_cost": False}
@@ -40,12 +40,15 @@ class Struct:
 
         ### Loading the underlying POMDP model ###
         if not self.env_correlation:
-            drmodel = np.load('pomdp_models/Dr3031C10.npz')
+            drmodel = np.load('pomdp_models/zayas_input.npz')
         else:
             drmodel = np.load('pomdp_models/Dr3031_H08.npz')
 
         # (ncomp components, nstcomp crack states)
         self.belief0 = np.zeros((self.n_comp, self.n_st_comp))
+
+        self.indZayas = drmodel['indZayas']
+        self.relSysc = drmodel['relSysc']
 
         if not self.env_correlation:
             self.belief0[:, :] = drmodel['belief0'][0, 0, :, 0]
@@ -55,7 +58,7 @@ class Struct:
 
             # (3 actions, 10 components, 30 cracks, 2 observations)
             self.O = drmodel['O'][:, 0, :, :]
-
+            
             self.belief0c = None
             self.b0cR = None
             self.alpha0 = None
@@ -189,7 +192,7 @@ class Struct:
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
             elif a[i] == 2:
-                cost_system += - 20
+                cost_system += - 15
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
         if self.n_comp < 2:  # single component setting
@@ -199,9 +202,9 @@ class Struct:
             PfSyS_ = self.pf_sys(PF_, self.k_comp)
             PfSyS = self.pf_sys(PF, self.k_comp)
         if PfSyS_ < PfSyS:
-            cost_system += PfSyS_ * (-10000)
+            cost_system += PfSyS_ * (-50000)
         else:
-            cost_system += (PfSyS_ - PfSyS) * (-10000)
+            cost_system += (PfSyS_ - PfSyS) * (-50000)
         if campaign_executed: # Assign campaign cost
             cost_system += -5
         return cost_system
