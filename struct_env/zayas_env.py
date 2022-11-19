@@ -37,6 +37,7 @@ class Struct:
 
         self.indZayas = drmodel['indZayas']
         self.relSysc = drmodel['relSysc']
+        self.comp_agent = drmodel['comp_agent'] #Link between element agent and component
         self.n_elem = 13
 
         self.belief0[:, :] = drmodel['belief0'][0, 0, :, 0]
@@ -47,7 +48,7 @@ class Struct:
         # (3 actions, 10 components, 30 cracks, 2 observations)
         self.O = drmodel['O'][:, 0, :, :]
 
-        self.agent_list = ["agent_" + str(i) for i in range(self.n_comp)] # (must be 13 elements and agents here)
+        self.agent_list = ["agent_" + str(i) for i in range(self.n_elem)] # one agent per element
 
         self.time_step = 0
         self.beliefs = self.belief0
@@ -66,9 +67,10 @@ class Struct:
         self.beliefs = self.belief0
         self.d_rate = np.zeros((self.n_comp, 1), dtype=int)
         self.observations = {}
-        for i in range(self.n_comp):
+        for i in range(self.n_elem):
+            beliefs_agents = self.beliefs[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else self.beliefs[self.indZayas[i,0]]
             self.observations[self.agent_list[i]] = np.concatenate(
-                (self.beliefs[i], [self.time_step / self.ep_length]))
+                (beliefs_agents.reshape(-1), [self.time_step / self.ep_length]))
 
         return self.observations
 
@@ -107,26 +109,29 @@ class Struct:
         # info = {"belief": self.beliefs}
         return self.observations, rewards, done
 
-    def pf_sys(self, pf, k):
-        """compute pf_sys for k-out-of-n components"""
-        n = pf.size
-        # k = ncomp-1
-        nk = n - k
-        m = k + 1
-        A = np.zeros(m + 1)
-        A[1] = 1
-        L = 1
-        for j in range(1, n + 1):
-            h = j + 1
-            Rel = 1 - pf[j - 1]
-            if nk < j:
-                L = h - nk
-            if k < j:
-                A[m] = A[m] + A[k] * Rel
-                h = k
-            for i in range(h, L - 1, -1):
-                A[i] = A[i] + (A[i - 1] - A[i]) * Rel
-        PF_sys = 1 - A[m]
+    def connectZayas(self, pf, indZayas): # from component state to element state # (Add here brace failure prob)!!
+        relComp = 1 - pf
+        relComp = np.append(relComp, 1)
+        relEl = np.zeros(self.n_elem)
+        for i in range(self.n_elem):
+            relEl[i] = relComp[ indZayas[i,0] ] * relComp[ indZayas[i,1] ]
+        return relEl
+
+    def elemState(self, pfEl, nEl): # from element state to element event #
+        qcomp = np.array([pfEl[-1], 1 - pfEl[-1]]) # first component
+        qprev = qcomp.copy() # initialize iterative procedure
+        for j in range(nEl - 1):
+            qnew = np.repeat( np.array([pfEl[-2-j], 1 - pfEl[-2-j]]), qprev.shape )
+            qprev = np.tile(qprev, 2)
+            qc = np.multiply(qprev, qnew)
+            qprev = qc
+        return qc
+
+    def pf_sys(self, pf): # system failure probability #
+        pfEl = 1 - self.connectZayas(pf, self.indZayas) 
+        q = self.elemState(pfEl, self.n_elem)
+        rel_ = self.relSysc.T.dot(q)
+        PF_sys = 1 - rel_
         return PF_sys
 
     def immediate_cost(self, B, a, B_, drate):
