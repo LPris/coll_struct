@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class Struct:
 
     def __init__(self, config=None):
@@ -75,8 +74,8 @@ class Struct:
         return self.observations
 
     def step(self, action: dict):
-        action_ = np.zeros(self.n_comp, dtype=int)
-        for i in range(self.n_comp):
+        action_ = np.zeros(self.n_elem, dtype=int)
+        for i in range(self.n_elem):
             action_[i] = action[self.agent_list[i]]
 
         observation_, belief_prime, drate_prime = \
@@ -90,15 +89,16 @@ class Struct:
         reward = self.discount_reward ** self.time_step * reward_.item()  # Convert float64 to float
 
         rewards = {}
-        for i in range(self.n_comp):
+        for i in range(self.n_elem):
             rewards[self.agent_list[i]] = reward
 
         self.time_step += 1
 
         self.observations = {}
-        for i in range(self.n_comp):
+        for i in range(self.n_elem):
+            beliefs_agents = belief_prime[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else belief_prime[self.indZayas[i,0]]
             self.observations[self.agent_list[i]] = np.concatenate(
-                (belief_prime[i], [self.time_step / self.ep_length]))
+                (beliefs_agents.reshape(-1), [self.time_step / self.ep_length]))
 
         self.beliefs = belief_prime
         self.d_rate = drate_prime
@@ -107,7 +107,7 @@ class Struct:
         done = self.time_step >= self.ep_length
 
         # info = {"belief": self.beliefs}
-        return self.observations, rewards, done
+        return self.observations, rewards, done, observation_
 
     def connectZayas(self, pf, indZayas): # from component state to element state # (Add here brace failure prob)!!
         relComp = 1 - pf
@@ -141,23 +141,23 @@ class Struct:
         PF = B[:, -1]
         PF_ = B_[:, -1].copy()
         campaign_executed = False
-        for i in range(self.n_comp):
+        for i in range(self.n_elem):
             if a[i] == 1:
-                cost_system += -0.2 if self.campaign_cost else -1 # Individual inspection costs 
-                Bplus = self.P[a[i], drate[i, 0]].T.dot(B[i, :])
-                PF_[i] = Bplus[-1]
+                cost_system += -0.4 if self.campaign_cost else -2 # Individual inspection costs 
+                Bplus = self.P[a[i], drate[self.indZayas[i,0], 0]].T.dot(B[self.indZayas[i,0], :])
+                PF_[self.indZayas[i,0]] = Bplus[-1]
+                if self.indZayas[i,1]>0:
+                    Bplus = self.P[a[i], drate[self.indZayas[i,1], 0]].T.dot(B[self.indZayas[i,1], :])
+                    PF_[self.indZayas[i,1]] = Bplus[-1]
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
             elif a[i] == 2:
-                cost_system += - 15
+                cost_system += - 30
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
-        if self.n_comp < 2:  # single component setting
-            PfSyS_ = PF_
-            PfSyS = PF
-        else:
-            PfSyS_ = self.pf_sys(PF_, self.k_comp)
-            PfSyS = self.pf_sys(PF, self.k_comp)
+        
+        PfSyS_ = self.pf_sys(PF_)
+        PfSyS = self.pf_sys(PF)
         if PfSyS_ < PfSyS:
             cost_system += PfSyS_ * (-50000)
         else:
@@ -174,7 +174,7 @@ class Struct:
         ob = np.zeros(self.n_comp)
         drate_prime = np.zeros((self.n_comp, 1), dtype=int)
         for i in range(self.n_comp):
-            p1 = self.P[a[i], drate[i, 0]].T.dot(
+            p1 = self.P[a[self.comp_agent[i]], drate[i, 0]].T.dot(
                 b_prime[i, :])  # environment transition
 
             b_prime[i, :] = p1
@@ -183,8 +183,8 @@ class Struct:
             # At every timestep, the deterioration rate increases
 
             ob[i] = 2  # ib[o] = 0 if no crack detected 1 if crack detected
-            if a[i] == 1:
-                Obs0 = np.sum(p1 * self.O[a[i], :, 0])
+            if a[self.comp_agent[i]] == 1:
+                Obs0 = np.sum(p1 * self.O[a[self.comp_agent[i]], :, 0])
                 # self.O = Probability to observe the crack
                 Obs1 = 1 - Obs0
 
@@ -194,9 +194,9 @@ class Struct:
                     ob_dist = np.array([Obs0, Obs1])
                     ob[i] = np.random.choice(range(0, self.n_obs), size=None,
                                              replace=True, p=ob_dist)
-                b_prime[i, :] = p1 * self.O[a[i], :, int(ob[i])] / (
-                    p1.dot(self.O[a[i], :, int(ob[i])]))  # belief update
-            if a[i] == 2:
+                b_prime[i, :] = p1 * self.O[a[self.comp_agent[i]], :, int(ob[i])] / (
+                    p1.dot(self.O[a[self.comp_agent[i]], :, int(ob[i])]))  # belief update
+            if a[self.comp_agent[i]] == 2:
                 # action in b_prime has already
                 # been accounted in the env transition
                 drate_prime[i, 0] = 0
