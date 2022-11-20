@@ -1,4 +1,4 @@
-env: struct
+env: zayas
 
 env_args:
   n_comp: 22
