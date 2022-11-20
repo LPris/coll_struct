@@ -318,3 +318,8 @@ delete.py
 delete
 
 launch_50.sbatch
+
+heuristics/Results/
+
+/sacred_cluster
+sacred_scripts/plots/
