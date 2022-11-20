@@ -47,6 +47,16 @@ class Struct:
         # (3 actions, 10 components, 30 cracks, 2 observations)
         self.O = drmodel['O'][:, 0, :, :]
 
+        # Loading collision input information
+        col_inputs = np.load('collisions/collision_info.npz')
+        self.freq_col = col_inputs['freq_col']
+        self.col_intens = col_inputs['col_intens']
+        self.energy_max = col_inputs['energy_max']
+        self.energy_max_index = col_inputs['energy_max_index']
+        self.energy_max_samp = col_inputs['energy_max_samp']
+        self.energy_impact = np.zeros(self.n_elem)
+        self.pf_brace = np.zeros(self.n_elem)
+
         self.agent_list = ["agent_" + str(i) for i in range(self.n_elem)] # one agent per element
 
         self.time_step = 0
@@ -82,7 +92,9 @@ class Struct:
             self.belief_update_uncorrelated(self.beliefs, action_,
                                             self.d_rate)
 
-
+        # energy_impact_prime = self.energy_collision(self.energy_impact)
+        # pf_brace_prime = self.pf_col(energy_impact_prime)
+        # print(energy_impact_prime, pf_brace_prime)
 
         reward_ = self.immediate_cost(self.beliefs, action_, belief_prime,
                                       self.d_rate)
@@ -109,12 +121,15 @@ class Struct:
         # info = {"belief": self.beliefs}
         return self.observations, rewards, done, observation_
 
-    def connectZayas(self, pf, indZayas): # from component state to element state # (Add here brace failure prob)!!
+    def connectZayas(self, pf, indZayas, pf_brace): # from component state to element state # (Add here brace failure prob)!!
         relComp = 1 - pf
         relComp = np.append(relComp, 1)
+        rel_brace = 1 - pf_brace
+        print('pf_brace: ', pf_brace)
         relEl = np.zeros(self.n_elem)
         for i in range(self.n_elem):
-            relEl[i] = relComp[ indZayas[i,0] ] * relComp[ indZayas[i,1] ]
+            relEl[i] = relComp[ indZayas[i,0] ] * relComp[ indZayas[i,1] ] * rel_brace[i]
+        print('reliabilities: ', rel_brace, relEl)
         return relEl
 
     def elemState(self, pfEl, nEl): # from element state to element event #
@@ -127,8 +142,8 @@ class Struct:
             qprev = qc
         return qc
 
-    def pf_sys(self, pf): # system failure probability #
-        pfEl = 1 - self.connectZayas(pf, self.indZayas) 
+    def pf_sys(self, pf, pf_brace): # system failure probability #
+        pfEl = 1 - self.connectZayas(pf, self.indZayas, pf_brace) 
         q = self.elemState(pfEl, self.n_elem)
         rel_ = self.relSysc.T.dot(q)
         PF_sys = 1 - rel_
@@ -138,26 +153,36 @@ class Struct:
         """ immediate reward (-cost),
          based on current damage state and action """
         cost_system = 0
+        # hotspots pf 
         PF = B[:, -1]
         PF_ = B_[:, -1].copy()
+        # brace collision pf
         campaign_executed = False
+        pf_brace = self.pf_brace
+        pf_brace_ = self.pf_brace.copy()
+        energy_impact_prime = self.energy_collision(self.energy_impact)
+        pf_brace_ = self.pf_col(energy_impact_prime)
         for i in range(self.n_elem):
             if a[i] == 1:
                 cost_system += -0.4 if self.campaign_cost else -2 # Individual inspection costs 
                 Bplus = self.P[a[i], drate[self.indZayas[i,0], 0]].T.dot(B[self.indZayas[i,0], :])
                 PF_[self.indZayas[i,0]] = Bplus[-1]
-                if self.indZayas[i,1]>0:
+                if self.indZayas[i,1] > 0:
                     Bplus = self.P[a[i], drate[self.indZayas[i,1], 0]].T.dot(B[self.indZayas[i,1], :])
                     PF_[self.indZayas[i,1]] = Bplus[-1]
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
             elif a[i] == 2:
-                cost_system += - 30
+                self.energy_impact[i] = 0
+                pf_brace_[i] = 0
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
         
-        PfSyS_ = self.pf_sys(PF_)
-        PfSyS = self.pf_sys(PF)
+        PfSyS_ = self.pf_sys(PF_, pf_brace_)
+        PfSyS = self.pf_sys(PF, pf_brace)
+        print('pf_brace: ', pf_brace, pf_brace_)
+        print('PfSyS: ', PfSyS, PfSyS_)
+        self.pf_brace = pf_brace_
         if PfSyS_ < PfSyS:
             cost_system += PfSyS_ * (-50000)
         else:
@@ -201,3 +226,23 @@ class Struct:
                 # been accounted in the env transition
                 drate_prime[i, 0] = 0
         return ob, b_prime, drate_prime
+
+    def energy_collision(self, impact_energy_start):
+        collision_events = np.random.poisson(lam = self.freq_col, size=None)
+        index_impact_braces = np.array([0, 1, 2, 3, 8, 9, 10, 11], dtype = int)
+        impact_energy = impact_energy_start.copy()
+        print('collision_events', collision_events)
+        for i in range(5):
+            if collision_events[i] > 0:
+                for _ in range(collision_events[i]):
+                    ind_energy = np.random.choice(index_impact_braces)
+                    impact_energy[ind_energy] += self.col_intens[i]
+        self.energy_impact = impact_energy
+        return impact_energy
+    
+    def pf_col(self, energy):
+        pf_brace = np.zeros(self.n_elem)
+        for i in range(self.n_elem):
+            if energy[i] > 0:
+                pf_brace[i] = np.sum(self.energy_max[self.energy_max_index[i]] < energy[i]) / self.energy_max_samp
+        return pf_brace
