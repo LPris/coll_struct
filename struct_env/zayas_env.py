@@ -50,13 +50,13 @@ class Struct:
         # Loading collision input information
         col_inputs = np.load('collisions/collision_info.npz')
         self.freq_col = col_inputs['freq_col']
+        # self.freq_col = np.zeros(5) # This should be user defined #
         self.col_intens = col_inputs['col_intens']
         self.energy_max = col_inputs['energy_max']
         self.energy_max_index = col_inputs['energy_max_index']
         self.energy_max_samp = col_inputs['energy_max_samp']
         self.energy_impact = np.zeros(self.n_elem)
         self.pf_brace = np.zeros(self.n_elem)
-
         self.agent_list = ["agent_" + str(i) for i in range(self.n_elem)] # one agent per element
 
         self.time_step = 0
@@ -75,11 +75,13 @@ class Struct:
         self.time_step = 0
         self.beliefs = self.belief0
         self.d_rate = np.zeros((self.n_comp, 1), dtype=int)
+        self.energy_impact = np.zeros(self.n_elem)
+        self.pf_brace = np.zeros(self.n_elem)
         self.observations = {}
         for i in range(self.n_elem):
             beliefs_agents = self.beliefs[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else self.beliefs[self.indZayas[i,0]]
             self.observations[self.agent_list[i]] = np.concatenate(
-                (beliefs_agents.reshape(-1), [self.time_step / self.ep_length]))
+                (beliefs_agents.reshape(-1), [self.pf_brace[i]], [self.time_step / self.ep_length]))
 
         return self.observations
 
@@ -110,7 +112,7 @@ class Struct:
         for i in range(self.n_elem):
             beliefs_agents = belief_prime[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else belief_prime[self.indZayas[i,0]]
             self.observations[self.agent_list[i]] = np.concatenate(
-                (beliefs_agents.reshape(-1), [self.time_step / self.ep_length]))
+                (beliefs_agents.reshape(-1), [self.pf_brace[i]], [self.time_step / self.ep_length]))
 
         self.beliefs = belief_prime
         self.d_rate = drate_prime
@@ -125,11 +127,9 @@ class Struct:
         relComp = 1 - pf
         relComp = np.append(relComp, 1)
         rel_brace = 1 - pf_brace
-        print('pf_brace: ', pf_brace)
         relEl = np.zeros(self.n_elem)
         for i in range(self.n_elem):
             relEl[i] = relComp[ indZayas[i,0] ] * relComp[ indZayas[i,1] ] * rel_brace[i]
-        print('reliabilities: ', rel_brace, relEl)
         return relEl
 
     def elemState(self, pfEl, nEl): # from element state to element event #
@@ -180,8 +180,6 @@ class Struct:
         
         PfSyS_ = self.pf_sys(PF_, pf_brace_)
         PfSyS = self.pf_sys(PF, pf_brace)
-        print('pf_brace: ', pf_brace, pf_brace_)
-        print('PfSyS: ', PfSyS, PfSyS_)
         self.pf_brace = pf_brace_
         if PfSyS_ < PfSyS:
             cost_system += PfSyS_ * (-50000)
@@ -231,7 +229,6 @@ class Struct:
         collision_events = np.random.poisson(lam = self.freq_col, size=None)
         index_impact_braces = np.array([0, 1, 2, 3, 8, 9, 10, 11], dtype = int)
         impact_energy = impact_energy_start.copy()
-        print('collision_events', collision_events)
         for i in range(5):
             if collision_events[i] > 0:
                 for _ in range(collision_events[i]):
