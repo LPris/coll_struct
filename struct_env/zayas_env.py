@@ -78,8 +78,12 @@ class Zayas:
         self.energy_impact = np.zeros(self.n_elem)
         self.pf_brace = np.zeros(self.n_elem)
         self.observations = {}
+
         for i in range(self.n_elem):
-            beliefs_agents = self.beliefs[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else self.beliefs[self.indZayas[i,0]]
+            if self.indZayas[i,1] > 0:
+                beliefs_agents = self.beliefs[self.indZayas[i,0]:self.indZayas[i,1] + 1]  
+            else:
+                beliefs_agents = np.concatenate( ( [self.beliefs[self.indZayas[i,0]]], [np.zeros(30)] ))
             self.observations[self.agent_list[i]] = np.concatenate(
                 (beliefs_agents.reshape(-1), [self.pf_brace[i]], [self.time_step / self.ep_length]))
 
@@ -110,7 +114,10 @@ class Zayas:
 
         self.observations = {}
         for i in range(self.n_elem):
-            beliefs_agents = belief_prime[self.indZayas[i,0]:self.indZayas[i,1] + 1] if self.indZayas[i,1]>0 else belief_prime[self.indZayas[i,0]]
+            if self.indZayas[i,1] > 0:
+                beliefs_agents = belief_prime[self.indZayas[i,0]:self.indZayas[i,1] + 1]  
+            else:
+                beliefs_agents = np.concatenate( ( [belief_prime[self.indZayas[i,0]]], [np.zeros(30)] ))
             self.observations[self.agent_list[i]] = np.concatenate(
                 (beliefs_agents.reshape(-1), [self.pf_brace[i]], [self.time_step / self.ep_length]))
 
