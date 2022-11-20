@@ -1,6 +1,6 @@
 import numpy as np
 
-class Struct:
+class Zayas:
 
     def __init__(self, config=None):
         if config is None:
