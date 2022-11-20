@@ -4,7 +4,7 @@ from struct_env.MultiAgentEnv import MultiAgentEnv
 from struct_env.zayas_env import Zayas
 
 
-class PymarlMAStruct(MultiAgentEnv):
+class PymarlMAZayas(MultiAgentEnv):
     def __init__(self,
                  n_comp: int = 22,
                  # Number of structure
