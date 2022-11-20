@@ -195,7 +195,6 @@ class Zayas:
             cost_system += (PfSyS_ - PfSyS) * (-50000)
         if campaign_executed: # Assign campaign cost
             cost_system += -5
-        print(PfSyS, PfSyS_, cost_system)
         return cost_system
 
     def belief_update_uncorrelated(self, b, a, drate):
