@@ -180,6 +180,7 @@ class Zayas:
                 if self.campaign_cost and not campaign_executed:
                     campaign_executed = True # Campaign executed
             elif a[i] == 2:
+                cost_system += - 30
                 self.energy_impact[i] = 0
                 pf_brace_[i] = 0
                 if self.campaign_cost and not campaign_executed:
@@ -194,6 +195,7 @@ class Zayas:
             cost_system += (PfSyS_ - PfSyS) * (-50000)
         if campaign_executed: # Assign campaign cost
             cost_system += -5
+        print(PfSyS, PfSyS_, cost_system)
         return cost_system
 
     def belief_update_uncorrelated(self, b, a, drate):
