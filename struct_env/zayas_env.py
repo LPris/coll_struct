@@ -5,14 +5,17 @@ class Zayas:
     def __init__(self, config=None):
         if config is None:
             config = {"n_comp": 22,
+                      "freq_col": [0, 0, 0, 0, 0],
                       "discount_reward": 0.95,
                       "campaign_cost": False}
         assert "n_comp" in config and \
+               "freq_col" in config and \
                "discount_reward" in config and \
                "campaign_cost" in config, \
             "Missing env config"
 
         self.n_comp = config["n_comp"]
+        self.freq_col = np.array(config["freq_col"])
         self.discount_reward = config["discount_reward"]
         self.campaign_cost = config["campaign_cost"]
         self.time = 0
@@ -49,7 +52,7 @@ class Zayas:
 
         # Loading collision input information
         col_inputs = np.load('collisions/collision_info.npz')
-        self.freq_col = col_inputs['freq_col']
+        # self.freq_col = col_inputs['freq_col']
         # self.freq_col = np.zeros(5) # This should be user defined #
         self.col_intens = col_inputs['col_intens']
         self.energy_max = col_inputs['energy_max']

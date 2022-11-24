@@ -8,6 +8,8 @@ class PymarlMAZayas(MultiAgentEnv):
     def __init__(self,
                  n_comp: int = 22,
                  # Number of structure
+                 freq_col: list = [0, 0, 0, 0, 0],
+                 # Collision frequency
                  discount_reward: float = 0.95,
                  # float [0,1] importance of
                  # short-time reward vs long-time reward
@@ -39,6 +41,7 @@ class PymarlMAZayas(MultiAgentEnv):
             "Error in env parameters"
 
         self.n_comp = n_comp
+        self.freq_col = freq_col
         self.discount_reward = discount_reward
         self.state_obs = state_obs
         self.state_d_rate = state_d_rate
@@ -49,6 +52,7 @@ class PymarlMAZayas(MultiAgentEnv):
         self._seed = seed
 
         self.config = {"n_comp": n_comp,
+                       "freq_col": freq_col,
                        "discount_reward": discount_reward,
                        "campaign_cost": campaign_cost}
         self.struct_env = Zayas(self.config)

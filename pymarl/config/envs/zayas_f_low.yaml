@@ -2,7 +2,7 @@ env: zayas
 
 env_args:
   n_comp: 22
-  freq_col: [0, 0, 0, 0, 0]
+  freq_col: [1.e-2, 1.e-3, 5.e-4, 1.e-5, 1.e-6]
   discount_reward: 0.95
   state_obs: True
   state_d_rate: True
