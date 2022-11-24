@@ -2,10 +2,11 @@ env: zayas
 
 env_args:
   n_comp: 22
+  freq_col: [0, 0, 0, 0, 0]
   discount_reward: 0.95
   state_obs: True
   state_d_rate: True
-  obs_d_rate: False
+  obs_d_rate: True
   obs_multiple: False
   obs_all_d_rate: False
   campaign_cost: False
