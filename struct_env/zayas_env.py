@@ -15,7 +15,7 @@ class Zayas:
             "Missing env config"
 
         self.n_comp = config["n_comp"]
-        self.freq_col = config["freq_col"]
+        self.freq_col = np.array(config["freq_col"])
         self.discount_reward = config["discount_reward"]
         self.campaign_cost = config["campaign_cost"]
         self.time = 0
