@@ -90,6 +90,9 @@ class Heuristics():
                     for index in index_repair:
                         agent_ind = self.struct_env.comp_agent[index]
                         action_[self.struct_env.agent_list[agent_ind]] = 2
+            for i in range(self.struct_env.n_elem):
+                if self.struct_env.pf_brace[i] > 0.01:
+                    action_[self.struct_env.agent_list[i]] = 2
             [_, rew_, done_, insp_obs] = self.struct_env.step(action_)
             rew_total_ += rew_['agent_0']
         return rew_total_
