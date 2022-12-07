@@ -2,7 +2,7 @@ import numpy as np
 from datetime import datetime
 from os import path, makedirs
 
-from struct_env.zayas_env import Zayas
+from struct_env.zayas_env_plot import Zayas
 
 class Heuristics():
     def __init__(self,
@@ -71,6 +71,21 @@ class Heuristics():
                 print('Reward:', disp_cost)
         self.return_heur /= eval_size
         return self.return_heur
+
+    def eval_plot(self, eval_size, insp_int, comp_insp, pf_sys_rep):
+        action_logger = {}
+        cost_logger = []
+        self.return_heur = 0
+        for ep in range(eval_size):
+            return_heur_ep, actions_taken = self.episode_plot(insp_int, comp_insp, pf_sys_rep)
+            self.return_heur += return_heur_ep
+            action_logger["episode"+str(ep)] = actions_taken
+            cost_logger.append(self.struct_env.costs_plot)
+            disp_cost = self.return_heur/(ep+1)
+            # if ep%500==0:
+            #     print('Reward:', disp_cost)
+        self.return_heur /= eval_size
+        return self.return_heur, action_logger, cost_logger
     
     def episode(self, insp_int, comp_insp, pf_sys_rep):
         rew_total_ = 0
@@ -101,7 +116,43 @@ class Heuristics():
                 for i in range(self.struct_env.n_elem):
                     if self.struct_env.pf_brace[i] > 0.001:
                         action_[self.struct_env.agent_list[i]] = 2
+            print(action_)
             [_, rew_, done_, insp_obs] = self.struct_env.step(action_)
             rew_total_ += rew_['agent_0']
         return rew_total_
+
+    def episode_plot(self, insp_int, comp_insp, pf_sys_rep):
+        rew_total_ = 0
+        done_ = False
+        insp_obs = 2
+        self.struct_env.reset()
+        actions_log = {}
+        action = {}
+        for agent in self.struct_env.agent_list:
+            action[agent] = 0
+        while not done_:
+            action_ = action.copy()
+            if (self.struct_env.time_step%insp_int)==0 and self.struct_env.time_step>0:
+                pf = self.struct_env.beliefs[:,-1]
+                rel_elem = self.struct_env.connectZayas(pf, self.struct_env.indZayas, self.struct_env.pf_brace)
+                pf_elem = 1 - rel_elem
+                inspection_index = (-pf_elem).argsort()[:comp_insp]
+                for index in inspection_index:
+                    action_[self.struct_env.agent_list[index]] = 1
+            if np.sum(insp_obs) < self.struct_env.n_comp*2:
+                index_repair = np.where(insp_obs==1)[0]
+                if len(index_repair) > 0:
+                    for index in index_repair:
+                        agent_ind = self.struct_env.comp_agent[index]
+                        action_[self.struct_env.agent_list[agent_ind]] = 2
+            Pf_fat = self.struct_env.beliefs[:, -1].copy()
+            pf_sys_eval = self.struct_env.pf_sys(Pf_fat, self.struct_env.pf_brace)
+            if pf_sys_eval > pf_sys_rep:
+                for i in range(self.struct_env.n_elem):
+                    if self.struct_env.pf_brace[i] > 0.001:
+                        action_[self.struct_env.agent_list[i]] = 2
+            [_, rew_, done_, insp_obs] = self.struct_env.step(action_)
+            actions_log["year"+str(self.struct_env.time_step)] = action_
+            rew_total_ += rew_['agent_0']
+        return rew_total_, actions_log
         
